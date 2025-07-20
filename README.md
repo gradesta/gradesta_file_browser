@@ -53,3 +53,23 @@ The graph provider will respond with only one type of response:
     //list of writable (to the client) fields
 }
 ```
+
+---
+
+## Installation and Usage
+
+Install with [uv](https://github.com/astral-sh/uv):
+
+```sh
+uv pip install .
+```
+
+Run the server:
+
+```sh
+gradesta-file-browser
+```
+
+The server will start on ws://localhost:8000/ws
+
+---

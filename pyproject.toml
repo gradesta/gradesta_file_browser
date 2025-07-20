@@ -1,0 +1,20 @@
+[project]
+name = "gradesta_file_browser"
+version = "0.1.0"
+description = "A Gradesta graph provider serving the filesystem as a graph via websockets."
+authors = [
+    { name = "Timothy Hobbs", email = "goodnight@gradesta.com" }
+]
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "fastapi>=0.116.1",
+    "uvicorn[standard]>=0.33.0",
+]
+
+[project.scripts]
+gradesta-file-browser = "gradesta_file_browser.__main__:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
