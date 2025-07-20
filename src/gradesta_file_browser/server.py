@@ -21,11 +21,14 @@ def get_file_type(path):
     return 'file'
 
 def encode_file(path, mode='rb'):
-    with open(path, mode) as f:
-        data = f.read()
-        if 'b' in mode:
-            return base64.b64encode(data).decode('utf-8')
-        return data
+    try:
+        with open(path, mode) as f:
+            data = f.read()
+            if 'b' in mode:
+                return base64.b64encode(data).decode('utf-8')
+            return data
+    except (OSError, IOError, UnicodeDecodeError) as e:
+        return f"[Error reading file: {str(e)}]"
 
 def get_cell(cell_id: str) -> dict:
     """
@@ -89,18 +92,22 @@ def get_cell(cell_id: str) -> dict:
                 first_entry = os.path.join(path, entries[0])
                 cell['down'] = f'listing://{first_entry}'
         else:
-            ftype = get_file_type(path)
-            if ftype == 'text':
-                try:
-                    cell['text'] = encode_file(path, 'r')
-                except Exception:
-                    cell['file'] = encode_file(path)
-            elif ftype == 'image':
-                cell['image'] = encode_file(path)
-            elif ftype == 'audio':
-                cell['audio'] = encode_file(path)
+            # Check if we can read the file before attempting to encode it
+            if not os.access(path, os.R_OK):
+                cell['text'] = f"[Permission denied] {path}"
             else:
-                cell['file'] = encode_file(path)
+                ftype = get_file_type(path)
+                if ftype == 'text':
+                    try:
+                        cell['text'] = encode_file(path, 'r')
+                    except Exception:
+                        cell['file'] = encode_file(path)
+                elif ftype == 'image':
+                    cell['image'] = encode_file(path)
+                elif ftype == 'audio':
+                    cell['audio'] = encode_file(path)
+                else:
+                    cell['file'] = encode_file(path)
         return cell
     else:
         return get_cell(f'file://{cell_id}')
