@@ -37,7 +37,7 @@ def get_cell(cell_id: str) -> dict:
     if cell_id.startswith('listing://'):
         path = cell_id[len('listing://'):]
         parent = os.path.dirname(path.rstrip('/')) or '/'
-        if not os.path.exists(path):
+        if not os.path.exists(parent):
             return {
                 'cell-id': cell_id,
                 'skeleton': False,
