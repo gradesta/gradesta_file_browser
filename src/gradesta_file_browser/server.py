@@ -27,61 +27,83 @@ def encode_file(path, mode='rb'):
             return base64.b64encode(data).decode('utf-8')
         return data
 
-def get_cell(path: str) -> dict:
+def get_cell(cell_id: str) -> dict:
     """
-    Return a cell dict for the given path, following the Gradesta protocol.
+    Return a cell dict for the given cell_id, supporting both file:// and listing:// protocols.
     """
-    cell = {
-        'cell-id': path,
-        'skeleton': False,
-        'writeable': ['audio', 'image', 'text', 'file', 'left', 'right', 'up', 'down']
-    }
-    if os.path.isdir(path):
-        # Directory: vertical doubly-linked list of entries
+    if cell_id.startswith('listing://'):
+        path = cell_id[len('listing://'):]
+        parent = os.path.dirname(path.rstrip('/')) or '/'
+        if not os.path.exists(path):
+            return {
+                'cell-id': cell_id,
+                'skeleton': False,
+                'writeable': [],
+                'text': f'[Not found] {path}'
+            }
         try:
-            entries = sorted(os.listdir(path))
+            entries = sorted(os.listdir(parent))
         except PermissionError:
             entries = []
-            cell['text'] = f"[Permission denied] {os.path.basename(path) or path}"
-        cells = [os.path.join(path, e) for e in entries]
-        # Add .. cell at the top unless root
+        names = [os.path.join(parent, e) for e in entries]
+        idx = names.index(path) if path in names else -1
+        cell = {
+            'cell-id': cell_id,
+            'skeleton': False,
+            'writeable': [],
+            'text': os.path.basename(path) or path,
+            'right': f'file://{path}'
+        }
+        if idx > 0:
+            cell['up'] = f'listing://{names[idx-1]}'
+        if idx < len(names) - 1:
+            cell['down'] = f'listing://{names[idx+1]}'
+        if parent != '/':
+            cell['left'] = f'listing://{parent}'
+        return cell
+
+    elif cell_id.startswith('file://'):
+        path = cell_id[len('file://'):]
+        if not os.path.exists(path):
+            return {
+                'cell-id': cell_id,
+                'skeleton': False,
+                'writeable': [],
+                'text': f'[Not found] {path}'
+            }
+        cell = {
+            'cell-id': cell_id,
+            'skeleton': False,
+            'writeable': []
+        }
         parent = os.path.dirname(path.rstrip('/')) or '/'
-        if path != '/':
-            cells = ['..'] + cells
-        # Build up/down links
-        idx = None
-        if path != '/':
-            idx = 1  # .. is at 0
-        else:
-            idx = 0
-        for i, cell_path in enumerate(cells):
-            if cell_path == '..':
-                continue
-            if i > 0:
-                cell['up'] = cells[i-1]
-            if i < len(cells)-1:
-                cell['down'] = cells[i+1]
-        if 'text' not in cell:
-            cell['text'] = os.path.basename(path) or '/'
-        if path != '/':
-            cell['left'] = parent
-    else:
-        # File: link left to parent, set appropriate slot
-        parent = os.path.dirname(path.rstrip('/')) or '/'
-        cell['left'] = parent
-        ftype = get_file_type(path)
-        if ftype == 'text':
+        cell['left'] = f'listing://{path}'
+        if os.path.isdir(path):
+            cell['text'] = path
             try:
-                cell['text'] = encode_file(path, 'r')
-            except Exception:
-                cell['file'] = encode_file(path)
-        elif ftype == 'image':
-            cell['image'] = encode_file(path)
-        elif ftype == 'audio':
-            cell['audio'] = encode_file(path)
+                entries = sorted(os.listdir(path))
+            except PermissionError:
+                entries = []
+                cell['text'] = f"[Permission denied] {path}"
+            if entries:
+                first_entry = os.path.join(path, entries[0])
+                cell['down'] = f'listing://{first_entry}'
         else:
-            cell['file'] = encode_file(path)
-    return cell
+            ftype = get_file_type(path)
+            if ftype == 'text':
+                try:
+                    cell['text'] = encode_file(path, 'r')
+                except Exception:
+                    cell['file'] = encode_file(path)
+            elif ftype == 'image':
+                cell['image'] = encode_file(path)
+            elif ftype == 'audio':
+                cell['audio'] = encode_file(path)
+            else:
+                cell['file'] = encode_file(path)
+        return cell
+    else:
+        return get_cell(f'file://{cell_id}')
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
